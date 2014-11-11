@@ -45,16 +45,28 @@ conns = {}
 def hash(p):
     return "{}:{}".format(p['IP'].src, p['TCP'].sport)
 
-def build_synack(syn):
+def create_connection_state(syn):
+    print "Creating connection state for {}".format(hash(syn))
+    seq = syn['TCP'].seq
+    ack = syn['TCP'].seq + 1
+    synack = build_synack(syn, seq, ack)
+    conns[hash(syn)] = {
+            'syn': syn,
+            'synack': synack,
+            'seq': seq,
+            'ack': ack
+            }
+    return synack
+
+def build_synack(syn, seq, ack):
     dst = syn['IP'].src
     dport = syn['TCP'].sport
-    seq = syn['TCP'].seq
-    ack = seq + 1
     ip = IP(src=SERVER_ADDRESS, dst=dst)
     tcp = TCP(sport=SERVER_PORT, dport=dport, flags="SA", seq=seq, ack=ack, options=[('MSS', 1460)])
     return ip/tcp
 
 def update_rem_ack(p):
+    print "Recieved an ACK from {}, ACK'd {}".format(p['IP'].src, p['TCP'].ack)
     conns[hash(p)]['rem_ack'] = p['TCP'].ack
     if not 'ack' in conns[hash(p)].keys():
         conns[hash(p)]['keys'] = p
@@ -63,20 +75,16 @@ def handle_packet(p):
     print "Incoming: {}".format(p.summary())
     if p['TCP'].flags & SYN and not p['TCP'].flags & ACK:
         print "Recieved a SYN from {}, replying with SYNACK".format(p['IP'].src)
-        synack = build_synack(p)
-        conns[hash(p)] = {
-                'syn': p,
-                'synack': synack,
-                'seq': p['TCP'].seq,
-                'ack': p['TCP'].seq + 1
-                }
-        send(build_synack(p))
-    if p['TCP'].flags & ACK and not p['IP'].src == SERVER_ADDRESS:
-        print "Recieved an ACK from {}, ACK'd {}".format(p['IP'].src, p['TCP'].ack)
+        synack = create_connection_state(p)
+        send(synack)
+        return
+    if not hash(p) in conns.keys():
+        return # We have no business here
+    if p['TCP'].flags & ACK:
         update_rem_ack(p)
 
 if __name__ == "__main__":
-    lfilter = lambda (r): TCP in r and (r[TCP].dport == 80 or r[TCP].sport == 80)
+    lfilter = lambda (r): TCP in r and r[TCP].dport == SERVER_PORT and r[IP].dst == SERVER_ADDRESS
     sniff(lfilter=lfilter, prn=lambda p: handle_packet(p))
     print conns
     print "Dying at the request of the user..."
