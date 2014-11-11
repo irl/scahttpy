@@ -16,7 +16,7 @@ from scapy.all import *
 # ----------------------------------------------------------------------
 
 SERVER_ADDRESS="127.0.0.99" # Using the loopback interface is a bad idea
-SERVER_PORT="80"            # as packets will get recieved twice since
+SERVER_PORT=80              # as packets will get recieved twice since
                             # no deduplication is performed
 
 # ----------------------------------------------------------------------
@@ -30,13 +30,25 @@ URG = 0x20
 ECE = 0x40
 CWR = 0x80
 
+def build_synack(syn):
+    dst = syn['IP'].src
+    dport = syn['TCP'].sport
+    seq = syn['TCP'].seq
+    ack = seq + 1
+    ip = IP(src=SERVER_ADDRESS, dst=dst)
+    tcp = TCP(sport=SERVER_PORT, dport=dport, flags="SA", seq=seq, ack=ack, options=[('MSS', 1460)])
+    return ip/tcp
+
 def handle_packet(p):
     if p['TCP'].flags & SYN:
         print "Recieved a SYN from {}".format(p['IP'].src)
+        if not p['TCP'].flags & ACK:
+            send(build_synack(p))
+    print p.summary()
 
 if __name__ == "__main__":
     try:
-        sniff(filter="tcp and dst {} and port {}".format(SERVER_ADDRESS, SERVER_PORT),
+        sniff(filter="tcp and port {}".format(SERVER_PORT),
             prn=lambda p: handle_packet(p)) # Listen for incoming packets
     except KeyboardInterrupt:
         print "Dying at the request of the user..."
