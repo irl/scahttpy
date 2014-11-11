@@ -10,8 +10,8 @@ Initial tasks
 
  *  [x] Get Scapy to identify incoming connection requests
  *  [x] Get Scapy to complete a 3WHS
- *  [ ] Get Scapy to read the incoming HTTP request
- *  [ ] Get Scapy to reply to the HTTP request with an encoding of the packets
+ *  [x] Get Scapy to read the incoming HTTP request
+ *  [x] Get Scapy to reply to the HTTP request with an encoding of the packets
         that made up the 3WHS
 
 Futher tasks
