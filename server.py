@@ -51,9 +51,9 @@ def create_connection_state(syn):
     ack = syn['TCP'].seq + 1
     synack = build_synack(syn, seq, ack)
     conns[hash(syn)] = {
-            'syn': syn,
-            'synack': synack,
-            'seq': seq,
+            'hs-syn': syn,
+            'hs-synack': synack,
+            'seq': seq + 1,
             'ack': ack
             }
     return synack
@@ -68,8 +68,20 @@ def build_synack(syn, seq, ack):
 def update_rem_ack(p):
     print "Recieved an ACK from {}, ACK'd {}".format(p['IP'].src, p['TCP'].ack)
     conns[hash(p)]['rem_ack'] = p['TCP'].ack
-    if not 'ack' in conns[hash(p)].keys():
-        conns[hash(p)]['keys'] = p
+    if not 'hs-ack' in conns[hash(p)].keys():
+        conns[hash(p)]['hs-ack'] = p
+
+def handle_request(p):
+    conn = str(conns[hash(p)])
+    response = "HTTP/1.1 200 OK\x0d\x0aServer: Pretend to be Apache\x0d\x0aConnection: Close\x0d\x0aContent-Type: text/plain; charset=UTF-8\x0d\x0aContent-Length: {}\x0d\x0a\x0d\x0a{}".format(len(conn), conn)
+    dst = p['IP'].src                                                          
+    dport = p['TCP'].sport
+    seq = conns[hash(p)]['seq']
+    conns[hash(p)]['seq'] += len(p[TCP].payload)
+    ack = conns[hash(p)]['ack'] = conns[hash(p)]['ack'] + len(p[TCP].payload)
+    ip = IP(src=SERVER_ADDRESS, dst=dst)
+    tcp = TCP(sport=SERVER_PORT, dport=dport, flags="PA", seq=seq, ack=ack, options=[('MSS', 1460)])
+    send(ip/tcp/response)
 
 def handle_packet(p):
     print "Incoming: {}".format(p.summary())
@@ -82,6 +94,9 @@ def handle_packet(p):
         return # We have no business here
     if p['TCP'].flags & ACK:
         update_rem_ack(p)
+    if len(p['TCP'].payload) > 0:
+        print "Got a payload from {} of {} bytes".format(p['IP'].src, len(p[TCP].payload))
+        handle_request(p)
 
 if __name__ == "__main__":
     lfilter = lambda (r): TCP in r and r[TCP].dport == SERVER_PORT and r[IP].dst == SERVER_ADDRESS
