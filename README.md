@@ -20,6 +20,18 @@ You can do this with:
 sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST --sport 80 -j DROP
 ```
 
+Running the server
+------------------
+
+The configuration variables can be found near the top of the `server.py` file.
+You can configure there the server IP address and TCP port number. Note that you
+will need to use an IP address assigned to your machine as the kernel is still
+relied upon for things like ARP.
+
+```bash
+sudo python server.py
+```
+
 License
 -------
 
